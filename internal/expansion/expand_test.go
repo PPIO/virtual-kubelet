@@ -2,20 +2,24 @@ package expansion
 
 import (
 	"testing"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestMapReference(t *testing.T) {
-	// We use a struct here instead of a map because we need mappings to happen in order.
-	// Go maps are randomized.
-	type envVar struct {
-		Name  string
-		Value string
-	}
-
-	envs := []envVar{
-		{"FOO", "bar"},
-		{"ZOO", "$(FOO)-1"},
-		{"BLU", "$(ZOO)-2"},
+	envs := []api.EnvVar{
+		{
+			Name:  "FOO",
+			Value: "bar",
+		},
+		{
+			Name:  "ZOO",
+			Value: "$(FOO)-1",
+		},
+		{
+			Name:  "BLU",
+			Value: "$(ZOO)-2",
+		},
 	}
 
 	declaredEnv := map[string]string{

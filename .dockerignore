@@ -2,5 +2,3 @@
 private.env
 *.private.*
 providers/azurebatch/deployment/
-Dockerfile
-.dockerignore

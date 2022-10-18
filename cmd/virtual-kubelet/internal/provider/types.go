@@ -2,12 +2,12 @@ package provider
 
 const (
 	// OperatingSystemLinux is the configuration value for defining Linux.
-	OperatingSystemLinux = "linux"
+	OperatingSystemLinux = "Linux"
 	// OperatingSystemWindows is the configuration value for defining Windows.
-	OperatingSystemWindows = "windows"
+	OperatingSystemWindows = "Windows"
 )
 
-type OperatingSystems map[string]bool //nolint:golint
+type OperatingSystems map[string]bool // nolint:golint
 
 var (
 	// ValidOperatingSystems defines the group of operating systems
@@ -18,7 +18,7 @@ var (
 	}
 )
 
-func (o OperatingSystems) Names() []string { //nolint:golint
+func (o OperatingSystems) Names() []string { // nolint:golint
 	keys := make([]string, 0, len(o))
 	for k := range o {
 		keys = append(keys, k)

@@ -15,7 +15,6 @@
 package root
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,7 +28,7 @@ import (
 // Defaults for root command options
 const (
 	DefaultNodeName             = "virtual-kubelet"
-	DefaultOperatingSystem      = "linux"
+	DefaultOperatingSystem      = "Linux"
 	DefaultInformerResyncPeriod = 1 * time.Minute
 	DefaultMetricsAddr          = ":10255"
 	DefaultListenPort           = 10250 // TODO(cpuguy83)(VK1.0): Change this to an addr instead of just a port.. we should not be listening on all interfaces.
@@ -96,8 +95,6 @@ type Opts struct {
 	Version string
 }
 
-const maxInt32 = 1<<31 - 1
-
 // SetDefaultOpts sets default options for unset values on the passed in option struct.
 // Fields tht are already set will not be modified.
 func SetDefaultOpts(c *Opts) error {
@@ -131,10 +128,6 @@ func SetDefaultOpts(c *Opts) error {
 			if err != nil {
 				return errors.Wrap(err, "error parsing KUBELET_PORT environment variable")
 			}
-			if p > maxInt32 {
-				return fmt.Errorf("KUBELET_PORT environment variable is too large")
-			}
-			/* #nosec */
 			c.ListenPort = int32(p)
 		} else {
 			c.ListenPort = DefaultListenPort

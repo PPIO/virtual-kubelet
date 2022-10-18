@@ -54,7 +54,7 @@ var (
 //
 // Note: Implementers can choose to manage a node themselves, in which case
 // it is not needed to provide an implementation for this interface.
-type NodeProvider interface { //nolint:revive
+type NodeProvider interface { // nolint:golint
 	// Ping checks if the node is still active.
 	// This is intended to be lightweight as it will be called periodically as a
 	// heartbeat to keep the node marked as ready in Kubernetes.
@@ -84,7 +84,6 @@ func NewNodeController(p NodeProvider, node *corev1.Node, nodes v1.NodeInterface
 		serverNode: node,
 		nodes:      nodes,
 		chReady:    make(chan struct{}),
-		chDone:     make(chan struct{}),
 	}
 	for _, o := range opts {
 		if err := o(n); err != nil {
@@ -105,7 +104,7 @@ func NewNodeController(p NodeProvider, node *corev1.Node, nodes v1.NodeInterface
 }
 
 // NodeControllerOpt are the functional options used for configuring a node
-type NodeControllerOpt func(*NodeController) error //nolint:revive
+type NodeControllerOpt func(*NodeController) error // nolint:golint
 
 // WithNodeEnableLeaseV1 enables support for v1 leases.
 // V1 Leases share all the same properties as v1beta1 leases, except they do not fallback like
@@ -208,7 +207,7 @@ type ErrorHandler func(context.Context, error) error
 // NodeController deals with creating and managing a node object in Kubernetes.
 // It can register a node with Kubernetes and periodically update its status.
 // NodeController manages a single node entity.
-type NodeController struct { //nolint:revive
+type NodeController struct { // nolint:golint
 	p NodeProvider
 
 	// serverNode must be updated each time it is updated in API Server
@@ -224,12 +223,7 @@ type NodeController struct { //nolint:revive
 
 	nodeStatusUpdateErrorHandler ErrorHandler
 
-	// chReady is closed once the controller is ready to start the control loop
 	chReady chan struct{}
-	// chDone is closed once the control loop has exited
-	chDone chan struct{}
-	errMu  sync.Mutex
-	err    error
 
 	nodePingController *nodePingController
 	pingTimeout        *time.Duration
@@ -255,14 +249,7 @@ const (
 // node status update (because some things still expect the node to be updated
 // periodically), otherwise it will only use node status update with the configured
 // ping interval.
-func (n *NodeController) Run(ctx context.Context) (retErr error) {
-	defer func() {
-		n.errMu.Lock()
-		n.err = retErr
-		n.errMu.Unlock()
-		close(n.chDone)
-	}()
-
+func (n *NodeController) Run(ctx context.Context) error {
 	n.chStatusUpdate = make(chan *corev1.Node, 1)
 	n.p.NotifyNodeStatus(ctx, func(node *corev1.Node) {
 		n.chStatusUpdate <- node
@@ -284,22 +271,6 @@ func (n *NodeController) Run(ctx context.Context) (retErr error) {
 	}
 
 	return n.controlLoop(ctx, providerNode)
-}
-
-// Done signals to the caller when the controller is done and the control loop is exited.
-//
-// Call n.Err() to find out if there was an error.
-func (n *NodeController) Done() <-chan struct{} {
-	return n.chDone
-}
-
-// Err returns any errors that have occurred that trigger the control loop to exit.
-//
-// Err only returns a non-nil error after `<-n.Done()` returns.
-func (n *NodeController) Err() error {
-	n.errMu.Lock()
-	defer n.errMu.Unlock()
-	return n.err
 }
 
 func (n *NodeController) ensureNode(ctx context.Context, providerNode *corev1.Node) (err error) {
@@ -336,12 +307,14 @@ func (n *NodeController) ensureNode(ctx context.Context, providerNode *corev1.No
 
 // Ready returns a channel that gets closed when the node is fully up and
 // running. Note that if there is an error on startup this channel will never
-// be closed.
+// be started.
 func (n *NodeController) Ready() <-chan struct{} {
 	return n.chReady
 }
 
 func (n *NodeController) controlLoop(ctx context.Context, providerNode *corev1.Node) error {
+	close(n.chReady)
+
 	defer n.group.Wait()
 
 	var sleepInterval time.Duration
@@ -382,7 +355,6 @@ func (n *NodeController) controlLoop(ctx context.Context, providerNode *corev1.N
 		return false
 	}
 
-	close(n.chReady)
 	for {
 		shouldTerminate := loop()
 		if shouldTerminate {
@@ -685,9 +657,10 @@ func (t taintsStringer) String() string {
 
 func addNodeAttributes(ctx context.Context, span trace.Span, n *corev1.Node) context.Context {
 	return span.WithFields(ctx, log.Fields{
-		"node.UID":    string(n.UID),
-		"node.name":   n.Name,
-		"node.taints": taintsStringer(n.Spec.Taints),
+		"node.UID":     string(n.UID),
+		"node.name":    n.Name,
+		"node.cluster": n.ClusterName,
+		"node.taints":  taintsStringer(n.Spec.Taints),
 	})
 }
 

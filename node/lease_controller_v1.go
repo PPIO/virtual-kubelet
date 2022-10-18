@@ -114,7 +114,6 @@ func (c *leaseController) sync(ctx context.Context) {
 	pingResult, err := c.nodeController.nodePingController.getResult(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).Error("Could not get ping status")
-		return
 	}
 	if pingResult.error != nil {
 		log.G(ctx).WithError(pingResult.error).Error("Ping result is not clean, not updating lease")
@@ -333,7 +332,7 @@ func (e *nodeNotReadyError) Is(target error) bool {
 	return ok
 }
 
-func (e *nodeNotReadyError) As(target interface{}) bool {
+func (e *nodeNotReadyError) As(target error) bool {
 	val, ok := target.(*nodeNotReadyError)
 	if ok {
 		*val = *e

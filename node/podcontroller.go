@@ -20,11 +20,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/virtual-kubelet/virtual-kubelet/internal/queue"
+
 	"github.com/google/go-cmp/cmp"
 	pkgerrors "github.com/pkg/errors"
 	"github.com/virtual-kubelet/virtual-kubelet/errdefs"
 	"github.com/virtual-kubelet/virtual-kubelet/internal/manager"
-	"github.com/virtual-kubelet/virtual-kubelet/internal/queue"
 	"github.com/virtual-kubelet/virtual-kubelet/log"
 	"github.com/virtual-kubelet/virtual-kubelet/trace"
 	corev1 "k8s.io/api/core/v1"
@@ -177,18 +178,10 @@ type PodControllerConfig struct {
 
 	// SyncPodsFromKubernetesRateLimiter defines the rate limit for the SyncPodsFromKubernetes queue
 	SyncPodsFromKubernetesRateLimiter workqueue.RateLimiter
-	// SyncPodsFromKubernetesShouldRetryFunc allows for a custom retry policy for the SyncPodsFromKubernetes queue
-	SyncPodsFromKubernetesShouldRetryFunc ShouldRetryFunc
-
 	// DeletePodsFromKubernetesRateLimiter defines the rate limit for the DeletePodsFromKubernetesRateLimiter queue
 	DeletePodsFromKubernetesRateLimiter workqueue.RateLimiter
-	// DeletePodsFromKubernetesShouldRetryFunc allows for a custom retry policy for the SyncPodsFromKubernetes queue
-	DeletePodsFromKubernetesShouldRetryFunc ShouldRetryFunc
-
 	// SyncPodStatusFromProviderRateLimiter defines the rate limit for the SyncPodStatusFromProviderRateLimiter queue
 	SyncPodStatusFromProviderRateLimiter workqueue.RateLimiter
-	// SyncPodStatusFromProviderShouldRetryFunc allows for a custom retry policy for the SyncPodStatusFromProvider queue
-	SyncPodStatusFromProviderShouldRetryFunc ShouldRetryFunc
 
 	// Add custom filtering for pod informer event handlers
 	// Use this for cases where the pod informer handles more than pods assigned to this node
@@ -247,9 +240,9 @@ func NewPodController(cfg PodControllerConfig) (*PodController, error) {
 		podEventFilterFunc: cfg.PodEventFilterFunc,
 	}
 
-	pc.syncPodsFromKubernetes = queue.New(cfg.SyncPodsFromKubernetesRateLimiter, "syncPodsFromKubernetes", pc.syncPodFromKubernetesHandler, cfg.SyncPodsFromKubernetesShouldRetryFunc)
-	pc.deletePodsFromKubernetes = queue.New(cfg.DeletePodsFromKubernetesRateLimiter, "deletePodsFromKubernetes", pc.deletePodsFromKubernetesHandler, cfg.DeletePodsFromKubernetesShouldRetryFunc)
-	pc.syncPodStatusFromProvider = queue.New(cfg.SyncPodStatusFromProviderRateLimiter, "syncPodStatusFromProvider", pc.syncPodStatusFromProviderHandler, cfg.SyncPodStatusFromProviderShouldRetryFunc)
+	pc.syncPodsFromKubernetes = queue.New(cfg.SyncPodsFromKubernetesRateLimiter, "syncPodsFromKubernetes", pc.syncPodFromKubernetesHandler)
+	pc.deletePodsFromKubernetes = queue.New(cfg.DeletePodsFromKubernetesRateLimiter, "deletePodsFromKubernetes", pc.deletePodsFromKubernetesHandler)
+	pc.syncPodStatusFromProvider = queue.New(cfg.SyncPodStatusFromProviderRateLimiter, "syncPodStatusFromProvider", pc.syncPodStatusFromProviderHandler)
 
 	return pc, nil
 }
@@ -516,6 +509,7 @@ func (pc *PodController) syncPodInProvider(ctx context.Context, pod *corev1.Pod,
 	// more context is here: https://github.com/virtual-kubelet/virtual-kubelet/pull/760
 	if pod.DeletionTimestamp != nil && !running(&pod.Status) {
 		log.G(ctx).Debug("Force deleting pod from API Server as it is no longer running")
+		pc.deletePodsFromKubernetes.EnqueueWithoutRateLimit(ctx, key)
 		key = fmt.Sprintf("%v/%v", key, pod.UID)
 		pc.deletePodsFromKubernetes.EnqueueWithoutRateLimit(ctx, key)
 		return nil

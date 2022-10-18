@@ -19,8 +19,7 @@ import (
 	"go.opencensus.io/trace"
 )
 
-// TracingExporterOptions is the options passed to the tracing exporter init function.
-type TracingExporterOptions struct { //nolint: golint
+type TracingExporterOptions struct { // nolint: golint
 	Tags        map[string]string
 	ServiceName string
 }

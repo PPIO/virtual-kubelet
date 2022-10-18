@@ -33,9 +33,7 @@ func handleError(f handlerFunc) http.HandlerFunc {
 
 		code := httpStatusCode(err)
 		w.WriteHeader(code)
-		if _, err := io.WriteString(w, err.Error()); err != nil {
-			log.G(req.Context()).WithError(err).Error("error writing error response")
-		}
+		io.WriteString(w, err.Error()) //nolint:errcheck
 		logger := log.G(req.Context()).WithError(err).WithField("httpStatusCode", code)
 
 		if code >= 500 {

@@ -21,7 +21,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/virtual-kubelet/virtual-kubelet/errdefs"
@@ -106,8 +105,7 @@ func setupZpages(ctx context.Context) {
 	zpages.Handle(mux, "/debug")
 	go func() {
 		// This should never terminate, if it does, it will always terminate with an error
-		srv := &http.Server{Handler: mux, ReadHeaderTimeout: 30 * time.Second}
-		e := srv.Serve(listener)
+		e := http.Serve(listener, mux)
 		if e == http.ErrServerClosed {
 			return
 		}

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bombsimon/logrusr/v3"
+	"github.com/bombsimon/logrusr"
 	"github.com/sirupsen/logrus"
 	"github.com/virtual-kubelet/virtual-kubelet/log"
 	logruslogger "github.com/virtual-kubelet/virtual-kubelet/log/logrus"
@@ -18,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	klogv2 "k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -65,7 +65,7 @@ func wrapE2ETest(ctx context.Context, env *envtest.Environment, f func(context.C
 
 		// The following requires that E2E tests are performed *sequentially*
 		log.L = logger
-		klog.SetLogger(logrusr.New(sl))
+		klogv2.SetLogger(logrusr.NewLogger(sl))
 		f(ctx, t, env)
 	}
 }

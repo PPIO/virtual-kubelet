@@ -5,19 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/virtual-kubelet/virtual-kubelet/errdefs"
 	"github.com/virtual-kubelet/virtual-kubelet/log"
 	"github.com/virtual-kubelet/virtual-kubelet/node/api"
-	stats "github.com/virtual-kubelet/virtual-kubelet/node/api/statsv1alpha1"
 	"github.com/virtual-kubelet/virtual-kubelet/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
 const (
@@ -42,7 +42,7 @@ var (
 */
 
 // MockProvider implements the virtual-kubelet provider interface and stores pods in memory.
-type MockProvider struct { //nolint:golint
+type MockProvider struct { // nolint:golint
 	nodeName           string
 	operatingSystem    string
 	internalIP         string
@@ -54,7 +54,7 @@ type MockProvider struct { //nolint:golint
 }
 
 // MockConfig contains a mock virtual-kubelet's configurable parameters.
-type MockConfig struct { //nolint:golint
+type MockConfig struct { // nolint:golint
 	CPU    string `json:"cpu,omitempty"`
 	Memory string `json:"memory,omitempty"`
 	Pods   string `json:"pods,omitempty"`
@@ -97,7 +97,7 @@ func NewMockProvider(providerConfig, nodeName, operatingSystem string, internalI
 
 // loadConfig loads the given json configuration files.
 func loadConfig(providerConfig, nodeName string) (config MockConfig, err error) {
-	data, err := os.ReadFile(providerConfig)
+	data, err := ioutil.ReadFile(providerConfig)
 	if err != nil {
 		return config, err
 	}
@@ -283,7 +283,7 @@ func (p *MockProvider) GetContainerLogs(ctx context.Context, namespace, podName,
 	ctx = addAttributes(ctx, span, namespaceKey, namespace, nameKey, podName, containerNameKey, containerName)
 
 	log.G(ctx).Infof("receive GetContainerLogs %q", podName)
-	return io.NopCloser(strings.NewReader("")), nil
+	return ioutil.NopCloser(strings.NewReader("")), nil
 }
 
 // RunInContainer executes a command in a container in the pod, copying data
@@ -328,8 +328,8 @@ func (p *MockProvider) GetPods(ctx context.Context) ([]*v1.Pod, error) {
 	return pods, nil
 }
 
-func (p *MockProvider) ConfigureNode(ctx context.Context, n *v1.Node) { //nolint:golint
-	ctx, span := trace.StartSpan(ctx, "mock.ConfigureNode") //nolint:staticcheck,ineffassign
+func (p *MockProvider) ConfigureNode(ctx context.Context, n *v1.Node) { // nolint:golint
+	ctx, span := trace.StartSpan(ctx, "mock.ConfigureNode") // nolint:staticcheck,ineffassign
 	defer span.End()
 
 	n.Status.Capacity = p.capacity()
@@ -339,7 +339,7 @@ func (p *MockProvider) ConfigureNode(ctx context.Context, n *v1.Node) { //nolint
 	n.Status.DaemonEndpoints = p.nodeDaemonEndpoints()
 	os := p.operatingSystem
 	if os == "" {
-		os = "linux"
+		os = "Linux"
 	}
 	n.Status.NodeInfo.OperatingSystem = os
 	n.Status.NodeInfo.Architecture = "amd64"
@@ -467,14 +467,10 @@ func (p *MockProvider) GetStatsSummary(ctx context.Context) (*stats.Summary, err
 		for _, container := range pod.Spec.Containers {
 			// Grab a dummy value to be used as the total CPU usage.
 			// The value should fit a uint32 in order to avoid overflows later on when computing pod stats.
-
-			/* #nosec */
 			dummyUsageNanoCores := uint64(rand.Uint32())
 			totalUsageNanoCores += dummyUsageNanoCores
 			// Create a dummy value to be used as the total RAM usage.
 			// The value should fit a uint32 in order to avoid overflows later on when computing pod stats.
-
-			/* #nosec */
 			dummyUsageBytes := uint64(rand.Uint32())
 			totalUsageBytes += dummyUsageBytes
 			// Append a ContainerStats object containing the dummy stats to the PodStats object.

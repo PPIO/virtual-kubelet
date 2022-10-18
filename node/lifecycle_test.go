@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	watchutils "k8s.io/client-go/tools/watch"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 const (
 	// There might be a constant we can already leverage here
 	testNamespace        = "default"
-	informerResyncPeriod = 1 * time.Second
+	informerResyncPeriod = time.Duration(1 * time.Second)
 	testNodeName         = "testnode"
 	podSyncWorkers       = 3
 )
@@ -232,7 +232,7 @@ type system struct {
 }
 
 func (s *system) start(ctx context.Context) error {
-	go s.pc.Run(ctx, podSyncWorkers) //nolint:errcheck
+	go s.pc.Run(ctx, podSyncWorkers) // nolint:errcheck
 	select {
 	case <-s.pc.Ready():
 	case <-s.pc.Done():
@@ -367,14 +367,6 @@ func testDanglingPodScenario(ctx context.Context, t *testing.T, s *system, m tes
 
 }
 
-func sendErr(ctx context.Context, ch chan error, err error) {
-	select {
-	case <-ctx.Done():
-		log.G(ctx).WithError(err).Warn("timeout waiting to send test error")
-	case ch <- err:
-	}
-}
-
 func testDanglingPodScenarioWithDeletionTimestamp(ctx context.Context, t *testing.T, s *system, m testingProvider) {
 	t.Parallel()
 
@@ -398,17 +390,17 @@ func testDanglingPodScenarioWithDeletionTimestamp(ctx context.Context, t *testin
 	_, e := s.client.CoreV1().Pods(testNamespace).Create(ctx, podCopyWithDeletionTimestamp, metav1.CreateOptions{})
 	assert.NilError(t, e)
 
+	// Start the pod controller
+	assert.NilError(t, s.start(ctx))
 	watchErrCh := make(chan error)
+
 	go func() {
 		_, watchErr := watchutils.UntilWithoutRetry(ctx, watcher,
 			func(ev watch.Event) (bool, error) {
 				return ev.Type == watch.Deleted, nil
 			})
-		sendErr(ctx, watchErrCh, watchErr)
+		watchErrCh <- watchErr
 	}()
-
-	// Start the pod controller
-	assert.NilError(t, s.start(ctx))
 
 	select {
 	case <-ctx.Done():
@@ -444,7 +436,7 @@ func testCreateStartDeleteScenario(ctx context.Context, t *testing.T, s *system,
 				return pod.Name == p.ObjectMeta.Name, nil
 			})
 
-		sendErr(ctx, watchErrCh, watchErr)
+		watchErrCh <- watchErr
 	}()
 
 	// Create the Pod
@@ -473,7 +465,7 @@ func testCreateStartDeleteScenario(ctx context.Context, t *testing.T, s *system,
 				return pod.Status.Phase == corev1.PodRunning, nil
 			})
 
-		sendErr(ctx, watchErrCh, watchErr)
+		watchErrCh <- watchErr
 	}()
 
 	assert.NilError(t, s.start(ctx))
@@ -495,7 +487,7 @@ func testCreateStartDeleteScenario(ctx context.Context, t *testing.T, s *system,
 		_, watchDeleteErr := watchutils.UntilWithoutRetry(ctx, watcher2, func(ev watch.Event) (bool, error) {
 			return ev.Type == watch.Deleted, nil
 		})
-		sendErr(ctx, waitDeleteCh, watchDeleteErr)
+		waitDeleteCh <- watchDeleteErr
 	}()
 
 	// Setup a watch prior to pod deletion
@@ -503,7 +495,7 @@ func testCreateStartDeleteScenario(ctx context.Context, t *testing.T, s *system,
 	assert.NilError(t, err)
 	defer watcher.Stop()
 	go func() {
-		sendErr(ctx, watchErrCh, waitFunction(ctx, watcher))
+		watchErrCh <- waitFunction(ctx, watcher)
 	}()
 
 	// Delete the pod via deletiontimestamp
@@ -567,7 +559,7 @@ func testUpdatePodWhileRunningScenario(ctx context.Context, t *testing.T, s *sys
 			})
 		// This deepcopy is required to please the race detector
 		p = newPod.Object.(*corev1.Pod).DeepCopy()
-		sendErr(ctx, watchErrCh, watchErr)
+		watchErrCh <- watchErr
 	}()
 
 	// Start the pod controller

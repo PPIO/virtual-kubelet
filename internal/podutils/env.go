@@ -29,6 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apivalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/tools/record"
+	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	fieldpath "k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/utils/pointer"
 )
 
@@ -135,7 +139,7 @@ func getServiceEnvVarMap(rm *manager.ResourceManager, ns string, enableServiceLi
 	for i := range services {
 		service := services[i]
 		// ignore services where ClusterIP is "None" or empty
-		if !IsServiceIPSet(service) {
+		if !v1helper.IsServiceIPSet(service) {
 			continue
 		}
 		serviceName := service.Name
@@ -158,7 +162,7 @@ func getServiceEnvVarMap(rm *manager.ResourceManager, ns string, enableServiceLi
 		mappedServices = append(mappedServices, serviceMap[key])
 	}
 
-	for _, e := range FromServices(mappedServices) {
+	for _, e := range envvars.FromServices(mappedServices) {
 		m[e.Name] = e.Value
 	}
 	return m, nil
@@ -482,7 +486,7 @@ func getEnvironmentVariableValueWithValueFromFieldRef(ctx context.Context, env *
 // podFieldSelectorRuntimeValue returns the runtime value of the given
 // selector for a pod.
 func podFieldSelectorRuntimeValue(fs *corev1.ObjectFieldSelector, pod *corev1.Pod) (string, error) {
-	internalFieldPath, _, err := ConvertDownwardAPIFieldLabel(fs.APIVersion, fs.FieldPath, "")
+	internalFieldPath, _, err := podshelper.ConvertDownwardAPIFieldLabel(fs.APIVersion, fs.FieldPath, "")
 	if err != nil {
 		return "", err
 	}
@@ -493,5 +497,5 @@ func podFieldSelectorRuntimeValue(fs *corev1.ObjectFieldSelector, pod *corev1.Po
 		return pod.Spec.ServiceAccountName, nil
 
 	}
-	return ExtractFieldPathAsString(pod, internalFieldPath)
+	return fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
 }
